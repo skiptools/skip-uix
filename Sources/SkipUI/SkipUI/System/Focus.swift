@@ -4,6 +4,72 @@
 // under the terms of the GNU Lesser General Public License 3.0
 // as published by the Free Software Foundation https://fsf.org
 
+#if SKIP
+import SkipModel
+
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.focus.FocusRequester
+
+public final class FocusState<Value>: StateTracker {
+    public init() {
+        _wrappedValue = initialValue
+        StateTracking.register(self)
+    }
+
+    internal var initialValue: Value {
+        return false as Value // FIXME: Should be set to `nil` or `false` based on the type of Value, but it must be reified to check?
+    }
+
+    public var wrappedValue: Value {
+        get {
+            if let _wrappedValueState {
+                return _wrappedValueState.value
+            }
+            return _wrappedValue
+        }
+        set {
+            _wrappedValue = newValue
+            _wrappedValueState?.value = _wrappedValue
+        }
+    }
+    private var _wrappedValue: Value
+    private var _wrappedValueState: MutableState<Value>?
+
+    public func trackState() {
+        _wrappedValueState = mutableStateOf(_wrappedValue)
+    }
+}
+
+extension View {
+    public func focused<Value>(_ binding: FocusState<Value>, equals value: Value) -> some View {
+        return ComposeModifierView(targetView: self) { context in
+            let focusRequester = remember { FocusRequester() }
+            context.modifier = context.modifier
+                .focusRequester(focusRequester)
+                .onFocusChanged {
+                    if $0.hasFocus {
+                        binding.wrappedValue = value
+                    } else if binding.wrappedValue == value {
+                        binding.wrappedValue = binding.initialValue
+                    }
+                }
+            if value == binding.wrappedValue {
+                SideEffect { focusRequester.requestFocus() }
+            }
+            return ComposeResult.ok
+        }
+        return self
+    }
+
+    public func focused(_ condition: FocusState<Bool>) -> some View {
+        return focused(condition, equals: true)
+    }
+}
+#endif
+
 // TODO: Process for use in SkipUI
 
 #if false
